@@ -1,9 +1,9 @@
 /*
  * InfluxClient.h - Library for writing and querying a influxDB
  * with InfluxQL. No authentication and ZLS implemented
- * 
- * Created by Martin Steinbach, Juli 5, 2020.
- * 
+ *
+ * Created by Martin Steinbach, October 12, 2020.
+ *
  * Released into the public domain.
 */
 
@@ -20,10 +20,6 @@ typedef struct {
 
 class Influx {
     public:
-		/* constructor:
-	     *
-		 * serverURL: "http://IPADDR:PORT" - database:  "db_name"
-		 */
         Influx(String serverURL, String database);
         float getValueFromInfluxDB(String measurement);
         void sendMeasurementToInfluxDB(String measurement, float value);
@@ -32,7 +28,7 @@ class Influx {
         void writeData(String httpData);
         void setTag(String tag, String tagValue);
         String getMeasurementString(int type);
-		String errString;
+        String errString;
    private:
         String getValuesFromResponse(String response);
         float getValueFromValues(String values);
