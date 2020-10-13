@@ -1,5 +1,5 @@
 /*
- * InfluxClient.cpp - Library for writing and querying a influxDB
+ * InfluxClient.cpp - Library for writing and querying a InfluxDB
  * with InfluxQL. No authentication and TLS implemented.
  *
  * Created by Martin Steinbach, October 12, 2020.
@@ -14,7 +14,7 @@
 Influx::Influx(String serverURL, String database){
     _database = database;
     _serverURL = serverURL;
-    _baseQueryURL = serverURL + "/query?db=" + _database + "&precision=s";
+    _baseQueryURL = serverURL + "/query?db=" + _database + "&epoch=s";
     _baseWriteURL = serverURL + "/write?db=" + _database + "&precision=s";
     _tag = "tag";
     _tagValue = "somevalue";
@@ -44,9 +44,6 @@ void Influx::sendDataPointsToInfluxDB(DataPoint dataPoints[], int len) {
                     dataPoints[i].measurement,dataPoints[i].value));
         httpData.concat("\n");
     }
-
-    Serial.printf("DATA-POINTS:\n\n");
-    Serial.print(httpData);
 
     writeData(httpData);
 }
@@ -91,7 +88,7 @@ void Influx::writeData(String httpData) {
 }
 
 /*
- * Sends a single data point to the influxDB
+ * Sends a single data point to the InfluxDB
  */
 void Influx::sendMeasurementToInfluxDB(String measurement, float value) {
 
@@ -115,13 +112,41 @@ void Influx::sendMeasurementToInfluxDB(String measurement, float value) {
  * "name,tags,time,raum,value
  * temperature,,1588053087,keller,15.5"
  *
- * If I ask influxdb only for the value (SELECT value from ...),
+ * Asking InfluxDB only for the value (SELECT value from ...),
  * it returns the whole string above anyway.
  *
  */
 
-// getting latest data for specific series (e.g. temperature) from influxdb
-float Influx::getValueFromInfluxDB(String measurement) {
+/*
+ * getting mean value for specific series/measurement (e.g. temperature) from InfluxDB
+ * for a specific time in minutes.
+ */
+float Influx::getMeanValueFromInfluxDB(String measurement, unsigned int minutes) {
+
+    String requestData = "q=SELECT mean(value) FROM " + measurement
+		+ " WHERE time > now() - " + minutes + "m AND " + _tag + "='" + _tagValue + "'";
+
+    DataPoint dataPoint =  readData(requestData);
+    return dataPoint.value;
+}
+
+
+/*
+ * getting the youngest value for specific series/measurement (e.g. temperature)
+ * from InfluxDB.
+ */
+DataPoint Influx::getLastValueFromInfluxDB(String measurement) {
+
+    String requestData = "q=SELECT last(value) FROM " + measurement
+		+ " WHERE " + _tag + "='" + _tagValue + "'";
+
+    DataPoint dp = readData(requestData);
+    dp.measurement = measurement;
+    return dp;
+
+}
+
+DataPoint Influx::readData(String requestData) {
 
     HTTPClient http;
 
@@ -129,48 +154,70 @@ float Influx::getValueFromInfluxDB(String measurement) {
     http.addHeader("Content-Type", "application/x-www-form-urlencoded");
     http.addHeader("Accept", "application/csv");
 
-    String requestData = "q=SELECT mean(value) FROM " + measurement
-		+ " where time > now() - 10m AND " + _tag + "='" + _tagValue + "'";
-
     int responseCode = http.POST(requestData);
 
     if (responseCode == 200) {
         Serial.printf("HTTP response code (reading data): %d\n", responseCode);
         String payload = http.getString();
         http.end();
-        float value = getValueFromValues(getValuesFromResponse(payload));
-        return value;
+
+        DataPoint dataPoint;
+        dataPoint.currTime = getFieldFromPayload(2, payload).toInt();
+        dataPoint.value = getFieldFromPayload(3, payload).toFloat();
+
+        return dataPoint;
+
+
     } else {
         Serial.print("Error while getting values from Server - HTTP-Code: ");
         Serial.println(responseCode);
     }
-
 }
 
+/*
+ * Returns the requested field (first field is number 1) as a string
+ */
 
-// extracts the value from a comma separated list (last field) and returns a float
-float Influx::getValueFromValues(String values) {
-    unsigned int pos, i;
-    pos = 0;
-    i = values.length();
+String Influx::getFieldFromPayload(unsigned int fieldNumber, String payload) {
 
-    for (i = values.length(); i > 0; i--) {
-        if (values.charAt(i) == ',') {
-            //Serial.printf("found , at pos: %d\n", i);
-            pos = i;
+   unsigned int  sepLimit = fieldNumber--;
+
+    // get the line with the results
+    String line = getValuesFromResponse(payload);
+
+    // search the starting position of the requested field
+    int startPos = 0;
+    int sepCount = 0;
+
+    for(int i = 0; i < line.length(); i++ ) {
+
+        if (line.charAt(i) == ',') {sepCount++;}
+
+        if (sepCount == sepLimit) {
+            startPos = i + 1;
             break;
         }
     }
 
-    if (pos == 0) {
-        Serial.println("ERROR: no value in values");
-        return NULL;
-    } else {
-        String value = values.substring(pos + 1);
-        //Serial.println(value);
-        return value.toFloat();
+    // cut the string at the srating position
+    line = line.substring(startPos);
+
+    // search the right border of the field (if exists)
+    int endPos = 0;
+
+    for(int i = 0; i < line.length(); i++ ) {
+
+        if (line.charAt(i) == ',') {
+            endPos = i;
+            break;
+        }
     }
 
+    if (endPos == 0) { // already the last fiel
+        return line;
+    } else {
+        return line.substring(0,endPos);
+    }
 }
 
 // splits the comma separated value string from the header

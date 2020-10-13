@@ -16,22 +16,24 @@
 typedef struct {
         String measurement;
         float value;
+        int currTime;
 }DataPoint;
 
 class Influx {
     public:
         Influx(String serverURL, String database);
-        float getValueFromInfluxDB(String measurement);
+        float getMeanValueFromInfluxDB(String measurement, unsigned int minutes);
+        DataPoint getLastValueFromInfluxDB(String measurement);
         void sendMeasurementToInfluxDB(String measurement, float value);
         void sendDataPointsToInfluxDB(DataPoint dataPoints[], int len);
         String getDataPointString(String measurement, float value);
-        void writeData(String httpData);
         void setTag(String tag, String tagValue);
-        String getMeasurementString(int type);
         String errString;
    private:
         String getValuesFromResponse(String response);
-        float getValueFromValues(String values);
+        String getFieldFromPayload(unsigned int fieldNumber, String payload);
+        void writeData(String httpData);
+        DataPoint readData(String requestData);
         String _database;
         String _serverURL;
         String _baseQueryURL;
@@ -39,6 +41,5 @@ class Influx {
         String _tag;
         String _tagValue;
 };
-
 
 #endif

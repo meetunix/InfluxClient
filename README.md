@@ -36,11 +36,11 @@ flux.setTag("location", "attic");
 flux.sendMeasurementToInfluxDB("temperature", 18.899999);
 ```
 
-If you want to write more than one data points at a time (only one http-request)
+If you want to write more than one data point at a time (and use only one http-request)
 you can use the `sendDataPointsToInfluxDB` method.
 
 ```
-DataPoint dataPoint[LEN];
+DataPoint dataPoints[LEN];
 
 for (int m = 0 ; m < LEN ; m++ ) {
     dataPoints[m].measurement = getMeasurementString(m); // 'temperature'
@@ -52,11 +52,18 @@ flux.sendDataPointsToInfluxDB(dataPoints, LEN)
 
 ### reading
 
-At first set the tag you want to filter and read the value from server. Currently
-the mean value from the last 10 minutes will be returned. I will change that later.
+#### a single data point
+
+At first set the tag you want to filter. Then read the value from server identified by
+the measurement/series (e.g. `humidity`).
 
 ```
 flux.setTag("location", "attic");
 
-float value = flux.getValueFromInfluxDB('humidity');
+DataPoint dp = flux.getLastValueFromInfluxDB('humidity');
+Serial.println(dp.value + " from " + dp.currTime);
 ```
+
+#### avaerage data
+
+to be done
