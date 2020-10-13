@@ -64,6 +64,14 @@ DataPoint dp = flux.getLastValueFromInfluxDB('humidity');
 Serial.println(dp.value + " from " + dp.currTime);
 ```
 
-#### avaerage data
+#### average data
 
-to be done
+At first set the tag you want to filter. Then read the value from server identified by
+the measurement/series (e.g. `humidity`) and the period of time in minutes over
+which the average should be formed.
+
+```
+flux.setTag("location", "attic");
+
+float val = flux.getMeanValueFromInfluxDB('humiditya, 10');
+```
