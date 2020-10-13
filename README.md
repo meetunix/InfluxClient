@@ -73,5 +73,5 @@ which the average should be formed.
 ```
 flux.setTag("location", "attic");
 
-float val = flux.getMeanValueFromInfluxDB('humiditya, 10');
+float val = flux.getMeanValueFromInfluxDB('humidity', 10);
 ```
