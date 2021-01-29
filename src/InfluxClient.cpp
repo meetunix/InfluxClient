@@ -7,13 +7,14 @@
  * Released into the public domain.
 */
 
-#include "Arduino.h"
 #include "InfluxClient.h"
-#include <HTTPClient.h>
+#include <esp32-hal-log.h>
 
-Influx::Influx(String serverURL, String database){
+Influx::Influx(String serverURL, String database, String measurement){
     _database = database;
     _serverURL = serverURL;
+    _measurement = measurement;
+
     _baseQueryURL = serverURL + "/query?db=" + _database + "&epoch=s";
     _baseWriteURL = serverURL + "/write?db=" + _database + "&precision=s";
     _tag = "tag";
@@ -29,37 +30,31 @@ void Influx::setTag(String tag, String tagValue) {
     _tagValue = tagValue;
 }
 
-/*
- * Unlike sendMeasurementToInfluxDB this  method sends more than one measurement
- * per http request to the InfluxDB. Therefore it uses the data structure
- * DataPoint without checking validity.
- *
- */
-void Influx::sendDataPointsToInfluxDB(DataPoint dataPoints[], int len) {
+/***** build the http data string and sends it ******/
+void Influx::sendMeasurement(DataPoint dataPoints[], uint8_t len) {
 
-    String httpData;
-
-    for (int i = 0 ; i < len ; i++) {
-        httpData.concat(getDataPointString(
-                    dataPoints[i].measurement,dataPoints[i].value));
-        httpData.concat("\n");
+    // create string for fields
+    String fields;
+    DataPoint currData;
+    for (uint8_t i = 0 ; i < len; i++) {
+        currData = dataPoints[i];
+        fields.concat(currData.field + "=" + String(currData.value));
+        if (i < len - 1)
+            fields.concat(",");
     }
 
-    writeData(httpData);
-}
-
-/***** build the http data string ******/
-String Influx::getDataPointString(String measurement, float value) {
+    log_d("Measurement: %s", _measurement.c_str());
+    log_d("TAG: %s=%s", _tag.c_str(), _tagValue.c_str());
+    log_d("Fields: %s", fields.c_str());
 
     String httpData; // sample: "temperature,location=keller value=18.89999999999";
-    httpData.concat(measurement);
+    httpData.concat(_measurement);
     httpData.concat("," + _tag + "=");
     httpData.concat(_tagValue);
-    httpData.concat(" value=");
-    httpData.concat(String(value));
+    httpData.concat(" ");
+    httpData.concat(fields);
 
-    return httpData;
-
+    writeData(httpData);
 }
 
 /*
@@ -78,28 +73,13 @@ void Influx::writeData(String httpData) {
 
     int responseCode = http.POST(httpData);
     if (responseCode == 204) {
-        Serial.printf("HTTP response code (writing data): %d\n", responseCode);
+        log_d("HTTP response code (writing data): %d", responseCode);
     } else {
-        Serial.print("Error while writing values to server - HTTP-Code: ");
-        Serial.println(responseCode);
+        log_e("Error while writing values to server - HTTP-Code: %d", responseCode);
     }
 
     http.end();
 }
-
-/*
- * Sends a single data point to the InfluxDB
- */
-void Influx::sendMeasurementToInfluxDB(String measurement, float value) {
-
-    /***** build data string ******/
-
-    String httpData = getDataPointString(measurement, value);
-
-    writeData(httpData);
-
- }
-
 
 /*************************
  * READING FROM DATABASE *
@@ -135,13 +115,13 @@ float Influx::getMeanValueFromInfluxDB(String measurement, unsigned int minutes)
  * getting the youngest value for specific series/measurement (e.g. temperature)
  * from InfluxDB.
  */
-DataPoint Influx::getLastValueFromInfluxDB(String measurement) {
+DataPoint Influx::getLastValueFromInfluxDB(String field) {
 
-    String requestData = "q=SELECT last(value) FROM " + measurement
+    String requestData = "q=SELECT last(" + field + ") FROM " + _measurement
 		+ " WHERE " + _tag + "='" + _tagValue + "'";
 
     DataPoint dp = readData(requestData);
-    dp.measurement = measurement;
+    dp.field = field;
     return dp;
 
 }
@@ -157,20 +137,18 @@ DataPoint Influx::readData(String requestData) {
     int responseCode = http.POST(requestData);
 
     if (responseCode == 200) {
-        Serial.printf("HTTP response code (reading data): %d\n", responseCode);
+        log_d("HTTP response code (reading data): %d", responseCode);
         String payload = http.getString();
         http.end();
 
         DataPoint dataPoint;
-        dataPoint.currTime = getFieldFromPayload(2, payload).toInt();
+        //dataPoint.currTime = getFieldFromPayload(2, payload).toInt();
         dataPoint.value = getFieldFromPayload(3, payload).toFloat();
 
         return dataPoint;
 
-
     } else {
-        Serial.print("Error while getting values from Server - HTTP-Code: ");
-        Serial.println(responseCode);
+        log_d("Error while getting values from Server - HTTP-Code: %d", responseCode);
     }
 }
 
@@ -234,7 +212,7 @@ String Influx::getValuesFromResponse(String response){
     }
 
 	if (pos == 0) {
-        Serial.println("ERROR: no values in response");
+        log_e("ERROR: no values in response");
         return String(errString);
     } else {
         String csvValues = response.substring(pos);

@@ -12,22 +12,21 @@
 #ifndef InfluxClient_h
 #define InfluxClient_h
 #include "Arduino.h"
+#include <HTTPClient.h>
 
 typedef struct {
-        String measurement;
+        String field;
         float value;
-        int currTime;
 }DataPoint;
 
 class Influx {
     public:
-        Influx(String serverURL, String database);
+        Influx(String serverURL, String database, String measurement);
+        void sendMeasurement(DataPoint dataPoints[], uint8_t len);
+        void setTag(String tag, String tagValue);
+        void setMeasurement(String measurement);
         float getMeanValueFromInfluxDB(String measurement, unsigned int minutes);
         DataPoint getLastValueFromInfluxDB(String measurement);
-        void sendMeasurementToInfluxDB(String measurement, float value);
-        void sendDataPointsToInfluxDB(DataPoint dataPoints[], int len);
-        String getDataPointString(String measurement, float value);
-        void setTag(String tag, String tagValue);
         String errString;
    private:
         String getValuesFromResponse(String response);
@@ -40,6 +39,7 @@ class Influx {
         String _baseWriteURL;
         String _tag;
         String _tagValue;
+        String _measurement;
 };
 
 #endif
