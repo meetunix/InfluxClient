@@ -1,8 +1,8 @@
 /*
  * InfluxClient.h - Library for writing and querying a influxDB
- * with InfluxQL. No authentication and ZLS implemented
+ * with InfluxQL. No authentication and TLS implemented
  *
- * Created by Martin Steinbach, October 12, 2020.
+ * Copyright Martin Steinbach, 2021.
  *
  * Released into the public domain.
 */

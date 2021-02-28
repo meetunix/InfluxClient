@@ -2,7 +2,7 @@
  * InfluxClient.cpp - Library for writing and querying a InfluxDB
  * with InfluxQL. No authentication and TLS implemented.
  *
- * Created by Martin Steinbach, October 12, 2020.
+ * Copyright Martin Steinbach 2021.
  *
  * Released into the public domain.
 */
